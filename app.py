@@ -3,22 +3,31 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import time
+import os
 
 app = Flask(__name__)
 
+CHROME_PATH = "/opt/render/project/.render/chrome/opt/google/chrome/google-chrome"
+
 def scrape_google_search(query):
+    # Check if Chrome binary exists
+    if os.path.exists(CHROME_PATH):
+        chrome_status = "✅ Chrome binary found at expected path."
+        print("[INFO] Chrome binary located.")
+    else:
+        chrome_status = "❌ Chrome binary NOT found at expected path!"
+        print("[ERROR] Chrome binary missing! Expected at:", CHROME_PATH)
+
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")  # Needed for container environments
-
-    # 🔧 Explicitly point to Chrome binary installed by render-build.sh
-    options.binary_location = "/opt/render/project/.render/chrome/opt/google/chrome/google-chrome"
-
-    driver = webdriver.Chrome(options=options)
+    options.add_argument("--disable-dev-shm-usage")
+    options.binary_location = CHROME_PATH
 
     try:
+        driver = webdriver.Chrome(options=options)
+        print("[INFO] Chrome WebDriver launched successfully.")
         driver.get(f"https://www.google.com/search?q={query}")
         time.sleep(2)
 
@@ -31,20 +40,27 @@ def scrape_google_search(query):
             if len(results) >= 3:
                 break
 
-        return results
+        print(f"[INFO] Scraped {len(results)} results for query: '{query}'")
+        return chrome_status, results
 
     except Exception as e:
-        return [f"Error: {str(e)}"]
+        error_msg = f"{chrome_status} ❗ Error during scraping: {str(e)}"
+        print("[ERROR]", error_msg)
+        return error_msg, []
 
     finally:
-        driver.quit()
+        try:
+            driver.quit()
+            print("[INFO] WebDriver closed.")
+        except:
+            print("[WARN] WebDriver cleanup failed or was never started.")
 
 @app.route("/")
 def home():
-    query = "miss wet t-shirt vienna"
-    results = scrape_google_search(query)
+    query = "donald trump"
+    chrome_message, results = scrape_google_search(query)
 
-    html = f"<h1>Search results for: {query}</h1><ul>"
+    html = f"<h1>{chrome_message}</h1><h2>Search results for: {query}</h2><ul>"
     for link in results:
         html += f'<li><a href="{link}" target="_blank">{link}</a></li>'
     html += "</ul>"
