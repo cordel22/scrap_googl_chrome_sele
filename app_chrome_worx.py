@@ -4,8 +4,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import time
 import os
-import random  # Import random module to pick a user agent
-from user_agents import USER_AGENTS  # Import the user agents pool
 
 app = Flask(__name__)
 
@@ -20,15 +18,11 @@ def scrape_google_search(query):
         chrome_status = "❌ Chrome binary NOT found at expected path!"
         print("[ERROR] Chrome binary missing! Expected at:", CHROME_PATH)
 
-    # Randomly choose a user agent from the pool
-    user_agent = random.choice(USER_AGENTS)
-
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument(f"user-agent={user_agent}")  # Set the random user agent
     options.binary_location = CHROME_PATH
 
     try:
@@ -66,14 +60,9 @@ def home():
     query = "donald trump"
     chrome_message, results = scrape_google_search(query)
 
-    if results:  # If results were found
-        html = f"<h1>{chrome_message}</h1><h2>Search results for: {query}</h2><ul>"
-        for link in results:
-            html += f'<li><a href="{link}" target="_blank">{link}</a></li>'
-        html += "</ul>"
-        print("[INFO] Results successfully displayed.")
-    else:  # If no results were found or there was an error
-        html = f"<h1>{chrome_message}</h1><h2>No results found for: {query}. Please try again later.</h2>"
-        print("[ERROR] No results found or there was an error during scraping.")
+    html = f"<h1>{chrome_message}</h1><h2>Search results for: {query}</h2><ul>"
+    for link in results:
+        html += f'<li><a href="{link}" target="_blank">{link}</a></li>'
+    html += "</ul>"
 
     return html
