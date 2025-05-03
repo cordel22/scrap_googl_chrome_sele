@@ -3,20 +3,25 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import time
+import os
 
 app = Flask(__name__)
 
 def scrape_google_search(query):
-    # Set up headless Chrome
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")  # good for low-memory environments
+
+    # Specify the Chrome binary path (important for Render)
+    options.binary_location = "/opt/render/project/.render/chrome/opt/google/chrome/google-chrome"
+
     driver = webdriver.Chrome(options=options)
 
     try:
         driver.get(f"https://www.google.com/search?q={query}")
-        time.sleep(2)  # Let page load, increase if needed
+        time.sleep(2)
 
         results = []
         elements = driver.find_elements(By.XPATH, '//div[@class="yuRUbf"]/a')
@@ -48,4 +53,5 @@ def home():
     return html
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
