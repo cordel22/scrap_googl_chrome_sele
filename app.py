@@ -7,41 +7,43 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import os
 import random
-from user_agents import USER_AGENTS  # Your custom list of user agents
+from user_agents import USER_AGENTS
 
 app = Flask(__name__)
 
 CHROME_PATH = "/opt/render/project/.render/chrome/opt/google/chrome/google-chrome"
 
 def scrape_google_search(query):
-    # Step 1: Check Chrome binary
+    print("▶️ Starting scrape for query:", query)
+
+    # Step 1: Verify Chrome binary
     if os.path.exists(CHROME_PATH):
         chrome_status = "✅ Chrome binary found at expected path."
-        print("[INFO]", chrome_status)
+        print("[CHECK] Chrome binary: FOUND ✅")
     else:
         chrome_status = "❌ Chrome binary NOT found at expected path!"
-        print("[ERROR]", chrome_status)
+        print("[CHECK] Chrome binary: MISSING ❌ Expected at:", CHROME_PATH)
 
-    # Step 2: Setup WebDriver options with stealth
+    # Step 2: Prepare options with stealth
     user_agent = random.choice(USER_AGENTS)
-    print(f"[INFO] Using User-Agent: {user_agent}")
+    print("[INFO] Using user-agent:", user_agent)
 
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument(f"user-agent={user_agent}")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option("useAutomationExtension", False)
+    options.add_experimental_option('useAutomationExtension', False)
+    options.add_argument(f"user-agent={user_agent}")
     options.binary_location = CHROME_PATH
 
     try:
         driver = webdriver.Chrome(options=options)
-        print("[INFO] ✅ Chrome WebDriver launched successfully.")
-        
-        # Step 3: Inject JS to mask automation
+        print("[OK] Chrome WebDriver launched.")
+
+        # Step 3: Bypass headless detection via CDP
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
             "source": """
                 Object.defineProperty(navigator, 'webdriver', {
@@ -49,31 +51,28 @@ def scrape_google_search(query):
                 });
             """
         })
+        print("[OK] WebDriver stealth setup complete.")
 
         driver.get(f"https://www.google.com/search?q={query}")
-        print(f"[INFO] Navigating to Google Search for: {query}")
+        print("[OK] Navigated to Google search.")
 
-        # Step 4: Wait for search results to load
+        # Step 4: Wait dynamically for results
         try:
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, '//div[@class="yuRUbf"]/a'))
             )
-            print("[INFO] ✅ Primary results detected with main XPath.")
+            print("[OK] Search results detected.")
         except:
-            print("[WARN] Primary XPath did not return results. Trying alternate XPath...")
+            print("[FAIL] Timeout: Search results not found.")
+            print("[DEBUG] Page title:", driver.title)
+            print("[DEBUG] Current URL:", driver.current_url)
+            print("[DEBUG] Page source snippet:\n", driver.page_source[:1000])
+            return f"{chrome_status} ❗ Timeout waiting for search results", []
 
+        # Step 5: Extract links
         results = []
-        
-        # Step 5: Try primary XPath
         elements = driver.find_elements(By.XPATH, '//div[@class="yuRUbf"]/a')
-
-        # If empty, try backup XPath
-        if not elements:
-            elements = driver.find_elements(By.XPATH, '//a/h3/../../a')
-            if elements:
-                print("[INFO] ✅ Results found using backup XPath.")
-            else:
-                print("[ERROR] ❌ No results found using either XPath.")
+        print(f"[INFO] Found {len(elements)} result elements.")
 
         for el in elements:
             href = el.get_attribute("href")
@@ -82,12 +81,11 @@ def scrape_google_search(query):
             if len(results) >= 3:
                 break
 
-        # Step 6: Print diagnostic info
-        print(f"[INFO] Final page title: {driver.title}")
-        print(f"[INFO] Final URL: {driver.current_url}")
-        print("[DEBUG] Page source preview:\n", driver.page_source[:1000])
+        if results:
+            print(f"[SUCCESS] Scraped {len(results)} results for '{query}'")
+        else:
+            print("[WARN] No valid external links found in results.")
 
-        print(f"[INFO] ✅ Scraped {len(results)} valid result(s) for query: '{query}'")
         return chrome_status, results
 
     except Exception as e:
@@ -98,7 +96,7 @@ def scrape_google_search(query):
     finally:
         try:
             driver.quit()
-            print("[INFO] ✅ WebDriver closed successfully.")
+            print("[CLEANUP] WebDriver closed successfully.")
         except:
             print("[WARN] WebDriver cleanup failed or was never started.")
 
@@ -112,9 +110,9 @@ def home():
         for link in results:
             html += f'<li><a href="{link}" target="_blank">{link}</a></li>'
         html += "</ul>"
-        print("[INFO] ✅ Results successfully displayed.")
+        print("[INFO] Results successfully returned to browser.")
     else:
         html = f"<h1>{chrome_message}</h1><h2>No results found for: {query}. Please try again later.</h2>"
-        print("[ERROR] ❌ No results found or there was an error during scraping.")
+        print("[FAILURE] No results returned.")
 
     return html
