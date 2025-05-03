@@ -3,7 +3,6 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import time
-import os
 
 app = Flask(__name__)
 
@@ -12,9 +11,9 @@ def scrape_google_search(query):
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")  # good for low-memory environments
+    options.add_argument("--disable-dev-shm-usage")  # Needed for container environments
 
-    # Specify the Chrome binary path (important for Render)
+    # 🔧 Explicitly point to Chrome binary installed by render-build.sh
     options.binary_location = "/opt/render/project/.render/chrome/opt/google/chrome/google-chrome"
 
     driver = webdriver.Chrome(options=options)
@@ -51,9 +50,3 @@ def home():
     html += "</ul>"
 
     return html
-
-if __name__ == "__main__":
-    """
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
-    """
